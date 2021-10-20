@@ -1,0 +1,84 @@
+
+#include "CBTService_Melee.h"
+#include "Global.h"
+#include "Character/CAIController.h"
+#include "Character/CEnemy_AI.h"
+#include "Character/CPlayer.h"
+#include "Components/CBehaviorComponent.h"
+#include "Components/CStateComponent.h"
+#include "Components/CPatrolComponent.h"
+
+UCBTService_Melee::UCBTService_Melee()
+{
+	NodeName = "Melee";
+}
+
+
+void UCBTService_Melee::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
+{
+	Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
+
+	ACAIController* controller = Cast<ACAIController>(OwnerComp.GetOwner());
+	UCBehaviorComponent* behavior = CHelpers::GetComponent<UCBehaviorComponent>(controller);
+
+	ACEnemy_AI* aiPawn = Cast<ACEnemy_AI>(controller->GetPawn());
+	UCStateComponent* state = CHelpers::GetComponent<UCStateComponent>(aiPawn);
+	UCPatrolComponent* patrol = CHelpers::GetComponent<UCPatrolComponent>(aiPawn);
+
+	if (state->IsDeadMode())
+	{
+		behavior->SetWaitMode();
+		return;
+	}
+
+	//Hitted
+	if (state->IsHittedMode())
+	{
+		behavior->SetHittedMode();
+		return;
+	}
+
+	//No Target
+	ACPlayer* target = behavior->GetTargetPlayer();
+	if (target == nullptr)
+	{
+		if (patrol != nullptr && patrol->IsValid())
+		{
+			behavior->SetPatrolMode();
+			return;
+		}
+
+		behavior->SetWaitMode();
+		return;
+	}
+	//Exist Target
+	else
+	{
+		UCStateComponent* targetState = CHelpers::GetComponent<UCStateComponent>(target);
+		if (targetState->IsDeadMode())
+		{
+			behavior->SetWaitMode();
+			return;
+		}
+	}
+
+
+	float distance = aiPawn->GetDistanceTo(target);
+
+	//Inner BehaviorRange
+	if (distance < controller->GetBehaviorRange())
+	{
+		behavior->SetActionMode();
+		return;
+	}
+
+	//Inner SightRadius
+	if (distance < controller->GetSightRadius())
+	{
+		behavior->SetApproachMode();
+		return;
+	}
+
+
+}
+
